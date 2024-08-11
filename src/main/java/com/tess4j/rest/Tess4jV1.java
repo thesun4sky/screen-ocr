@@ -4,14 +4,6 @@ package com.tess4j.rest;
 import com.tess4j.rest.model.Image;
 import com.tess4j.rest.model.Status;
 import com.tess4j.rest.model.Text;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.net.URL;
-import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.List;
-import javax.imageio.ImageIO;
-
 import com.tess4j.rest.repository.ImageRepository;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
@@ -24,6 +16,16 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 @SpringBootApplication
 @RestController
@@ -124,6 +126,41 @@ public class Tess4jV1 {
     return userImages;
   }
 
+  @PostMapping(value = "ocr/v1/upload-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public Status doOcrWithFile(@RequestParam("file") MultipartFile file,
+                              @RequestParam("userId") String userId) throws Exception {
+    try {
+      byte[] imageBytes = file.getBytes();
+      String extension = getFileExtension(file.getOriginalFilename());
+
+      Tesseract tesseract = new Tesseract();
+      tesseract.setLanguage("kor+eng"); // 한글과 영어 모두 인식
+
+      ByteArrayInputStream bis = new ByteArrayInputStream(imageBytes);
+      String imageText = tesseract.doOCR(ImageIO.read(bis));
+
+      Image image = new Image();
+      image.setUserId(userId);
+      image.setImage(imageBytes);
+      image.setExtension(extension);
+      image.setText(imageText);
+
+      repository.save(image);
+      LOGGER.debug("OCR Result = " + imageText);
+
+      return new Status(imageText);
+    } catch (Exception e) {
+      LOGGER.error("Exception while processing file upload: ", e);
+      throw new TesseractException();
+    }
+  }
+
+  private String getFileExtension(String filename) {
+    return Optional.ofNullable(filename)
+            .filter(f -> f.contains("."))
+            .map(f -> f.substring(filename.lastIndexOf(".") + 1))
+            .orElse("");
+  }
   public static void main(String[] args) {
     SpringApplication.run(Tess4jV1.class, args);
   }

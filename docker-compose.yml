@@ -10,7 +10,3 @@ services:
     environment:
       - LC_ALL=C
       - TESSDATA_PREFIX=/usr/share/tessdata
-    depends_on:
-      - mongo
-    links:
-      - mongo  
