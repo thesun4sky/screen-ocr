@@ -4,7 +4,6 @@ package com.tess4j.rest;
 import com.tess4j.rest.model.Image;
 import com.tess4j.rest.model.Status;
 import com.tess4j.rest.model.Text;
-import com.tess4j.rest.mongo.ImageRepository;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.net.URL;
@@ -12,6 +11,8 @@ import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
+
+import com.tess4j.rest.repository.ImageRepository;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
 import org.apache.commons.codec.binary.Base64;
@@ -70,7 +71,10 @@ public class Tess4jV1 {
           "User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:31.0) Gecko/20100101 Firefox/31.0");
       conn.connect();
       FileUtils.copyInputStreamToFile(conn.getInputStream(), tmpFile);
+
       Tesseract tesseract = new Tesseract(); // JNA Interface Mapping
+      tesseract.setLanguage("kor+eng"); // 한글과 영어 모두 인식
+
       String imageText = tesseract.doOCR(tmpFile);
       LOGGER.debug("OCR Image Text = " + imageText);
       return new Text(imageText);

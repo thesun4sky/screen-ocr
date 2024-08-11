@@ -1,19 +1,37 @@
-/* (C) 2024 */
 package com.tess4j.rest.model;
 
-import org.springframework.data.annotation.Id;
+import jakarta.persistence.*;
 
+@Entity
+@Table(name = "images")
 public class Image {
 
-  @Id private String id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
+  @Column(name = "user_id")
   private String userId;
 
+  @Lob
+  @Column(name = "image_data")
   private byte[] image;
 
+  @Column(name = "extension")
   private String extension;
 
+  @Column(name = "text", columnDefinition = "TEXT")
   private String text;
+
+  // Getters and setters
+
+  public Long getId() {
+    return id;
+  }
+
+  public void setId(Long id) {
+    this.id = id;
+  }
 
   public String getUserId() {
     return userId;
@@ -50,6 +68,6 @@ public class Image {
   @Override
   public String toString() {
     return String.format(
-        "Image[userId=%s, image='%s', extenstion='%s', text='%s']", userId, image, extension, text);
+            "Image[id=%d, userId=%s, extension='%s', text='%s']", id, userId, extension, text);
   }
 }

@@ -3,8 +3,14 @@ FROM amazoncorretto:22.0.0-alpine3.19
 
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata/
 
+ENV LANG=ko_KR.UTF-8
+
 RUN apk update && \
-    apk add tesseract-ocr tesseract-ocr-data-eng ghostscript
+    apk add --no-cache tesseract-ocr \
+                       tesseract-ocr-data-eng \
+                       tesseract-ocr-data-kor \
+                       ghostscript \
+    && rm -rf /var/cache/apk/*
 
 ENV TESSDATA_PREFIX=/usr/share/tessdata
 
