@@ -1,14 +1,16 @@
 plugins {
     id 'org.springframework.boot' version '3.2.4'
+    id 'io.spring.dependency-management' version '1.1.4'
     id 'java'
     id 'idea'
 }
 
-apply plugin: 'io.spring.dependency-management'
-
 group = 'com.tess4j'
-sourceCompatibility = '21'
-targetCompatibility = '21'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_22
+}
 
 repositories {
     mavenCentral()
@@ -17,45 +19,30 @@ repositories {
 dependencies {
     // Spring Boot
     implementation 'org.springframework.boot:spring-boot-starter-web'
-
-    // Spring Data JPA
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
     // PostgreSQL driver
-    implementation 'org.postgresql:postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
 
-    implementation group: 'net.sourceforge.tess4j', name: 'tess4j', version: '5.11.0'
+    // Tess4J
+    implementation 'net.sourceforge.tess4j:tess4j:5.11.0'
 
     // Commons Codec for Base 64
-    implementation group: 'commons-codec', name: 'commons-codec', version: '1.16.1'
+    implementation 'commons-codec:commons-codec:1.16.1'
 
     // Commons IO
-    implementation group: 'commons-io', name: 'commons-io', version: '2.15.1'
+    implementation 'commons-io:commons-io:2.15.1'
 
-    // JUnit
-    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.10.2'
-
-    // Rest Assured
-    testImplementation group: 'io.rest-assured', name: 'rest-assured', version: '5.4.0'
-
+    // Test dependencies
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.rest-assured:rest-assured:5.4.0'
 }
 
-sourceSets {
-    main {
-        java {
-            srcDirs = ['src/main/java']
-        }
-        resources {
-            srcDirs = ['src/main/resources']
-        }
-    }
+tasks.named('test') {
+    useJUnitPlatform()
 }
 
-
-archivesBaseName = 'app'
-
-jar {
-    manifest {
-        attributes 'Main-Class': 'com.tess4j.rest.Tess4jV1'
-    }
+bootJar {
+    archiveBaseName = 'app'
+    mainClass = 'com.tess4j.rest.Tess4jV1'
 }
