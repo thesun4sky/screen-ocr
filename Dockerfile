@@ -1,15 +1,17 @@
 # Start with a base image containing Java runtime
-FROM amazoncorretto:22.0.0-alpine3.19
+FROM amazoncorretto:17-alpine3.19
 
-ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata/
+# Set environment variables
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata/ \
+    LANG=ko_KR.UTF-8
 
-ENV LANG=ko_KR.UTF-8
-
+# Install necessary packages
 RUN apk update && \
-    apk add --no-cache tesseract-ocr \
-                       tesseract-ocr-data-eng \
-                       tesseract-ocr-data-kor \
-                       ghostscript \
+    apk add --no-cache \
+        tesseract-ocr \
+        tesseract-ocr-data-eng \
+        tesseract-ocr-data-kor \
+        ghostscript \
     && rm -rf /var/cache/apk/*
 
 ENV TESSDATA_PREFIX=/usr/share/tessdata
@@ -18,10 +20,10 @@ ENV TESSDATA_PREFIX=/usr/share/tessdata
 ARG JAR_FILE=build/libs/app.jar
 
 # Add the application's jar to the container
-ADD ${JAR_FILE} app.jar
+COPY ${JAR_FILE} app.jar
 
 # Expose port 8080
 EXPOSE 8080
 
 # Run the jar file
-ENTRYPOINT ["java","-jar","/app.jar"]
+ENTRYPOINT ["java", "-jar", "/app.jar"]
