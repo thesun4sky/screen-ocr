@@ -27,6 +27,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
+        with:
+          gradle-version: '8.5'  # Specify the Gradle version explicitly
 
       - name: Cache Gradle packages
         uses: actions/cache@v3
@@ -38,15 +40,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Check Gradle Wrapper
+      - name: Regenerate Gradle Wrapper
         run: |
-          if [ ! -f "./gradlew" ]; then
-            echo "Gradle Wrapper not found. Generating Wrapper..."
-            gradle wrapper
-          fi
+          rm -f ./gradlew
+          rm -f ./gradlew.bat
+          rm -rf ./gradle/wrapper
+          gradle wrapper --gradle-version 8.5
+          chmod +x ./gradlew
 
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew build --info
 
       - name: Make zip file
         run: zip -r ./$PROJECT_NAME.zip . -x '*.git*'
