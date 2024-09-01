@@ -7,8 +7,9 @@ env:
   CODE_DEPLOY_DEPLOYMENT_GROUP: screen-fx-deploy-group
 
 on:
-  release:
-    types: [created]
+  push:
+    branches:
+      - master
 
 jobs:
   build:
