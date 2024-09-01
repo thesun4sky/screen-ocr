@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APP_NAME=ScreenFX
+APP_NAME=screen-fx
 REPOSITORY=/home/ubuntu/
 
 echo "> Check the currently running container"
