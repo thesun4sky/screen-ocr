@@ -7,7 +7,6 @@ plugins {
 apply plugin: 'io.spring.dependency-management'
 
 group = 'com.tess4j'
-version = '1.5'
 sourceCompatibility = '21'
 targetCompatibility = '21'
 
@@ -53,7 +52,7 @@ sourceSets {
 }
 
 
-archivesBaseName = 'ocr-tess4j-rest'
+archivesBaseName = 'app'
 
 jar {
     manifest {

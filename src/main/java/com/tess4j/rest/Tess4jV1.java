@@ -105,6 +105,12 @@ public class Tess4jV1 {
         ImageIO.write(regionImage, "png", outputFile);
 
         String recognizedText = tesseract.doOCR(regionImage).trim();
+        if (!recognizedText.contains("백 실버")) {
+          result.add(new TextWithCoordinates(
+                  "READY",0 ,0, 0 ,0
+          ));
+          break;
+        }
         String displayText = player.getDisplayText(recognizedText);
         result.add(new TextWithCoordinates(
                 displayText,

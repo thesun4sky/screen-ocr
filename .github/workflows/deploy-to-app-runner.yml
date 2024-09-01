@@ -1,0 +1,63 @@
+name: Deploy to EC2
+
+env:
+  PROJECT_NAME: screen-fx
+  BUCKET_NAME: screen-fx
+  CODE_DEPLOY_APP: screen-fx-app
+  CODE_DEPLOY_DEPLOYMENT_GROUP: screen-fx-deploy-group
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: CI/CD
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK 22
+        uses: actions/setup-java@v3
+        with:
+          java-version: '22'
+          distribution: 'temurin'  # Eclipse Temurin JDK is recommended for Java 22
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Make zip file
+        run: zip -r ./$PROJECT_NAME.zip . -x '*.git*'
+        shell: bash
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload to S3
+        run: aws s3 cp $PROJECT_NAME.zip s3://$BUCKET_NAME/deploy/$PROJECT_NAME.zip --region ap-northeast-2
+
+      - name: Code Deploy
+        run: >
+          aws deploy create-deployment --application-name $CODE_DEPLOY_APP
+          --deployment-config-name CodeDeployDefault.AllAtOnce
+          --deployment-group-name $CODE_DEPLOY_DEPLOYMENT_GROUP
+          --s3-location bucket=$BUCKET_NAME,bundleType=zip,key=deploy/$PROJECT_NAME.zip

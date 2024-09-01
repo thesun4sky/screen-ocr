@@ -15,13 +15,13 @@ RUN apk update && \
 ENV TESSDATA_PREFIX=/usr/share/tessdata
 
 # The application's jar file
-ARG JAR_FILE=build/libs/ocr-tess4j-rest-1.5.jar
+ARG JAR_FILE=build/libs/app.jar
 
 # Add the application's jar to the container
-ADD ${JAR_FILE} ocr-tess4j-rest-1.5.jar
+ADD ${JAR_FILE} app.jar
 
 # Expose port 8080
 EXPOSE 8080
 
 # Run the jar file
-ENTRYPOINT ["java","-jar","/ocr-tess4j-rest-1.5.jar"]
+ENTRYPOINT ["java","-jar","/app.jar"]
