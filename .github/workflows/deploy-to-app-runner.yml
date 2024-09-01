@@ -31,7 +31,11 @@ jobs:
           gradle-version: '8.6'
 
       - name: Build with Gradle
-        run: ./gradlew build --info
+        run: |
+          export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+          ./gradlew build --info
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.java.home=$JAVA_HOME"
 
       - name: Make zip file
         run: zip -r ./$PROJECT_NAME.zip . -x '*.git*'
