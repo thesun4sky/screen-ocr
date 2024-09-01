@@ -32,7 +32,7 @@ jobs:
 
       - name: Build with Gradle
         run: |
-          export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+          echo "JAVA_HOME is set to: $JAVA_HOME"
           ./gradlew build --info
         env:
           GRADLE_OPTS: "-Dorg.gradle.java.home=$JAVA_HOME"
