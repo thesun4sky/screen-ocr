@@ -106,9 +106,6 @@ public class Tess4jV1 {
 
         String recognizedText = tesseract.doOCR(regionImage).trim();
         if (!recognizedText.contains("백 실버")) {
-          result.add(new TextWithCoordinates(
-                  "READY",0 ,0, 0 ,0
-          ));
           break;
         }
         String displayText = player.getDisplayText(recognizedText);
@@ -124,6 +121,12 @@ public class Tess4jV1 {
       e.printStackTrace();
     } catch (TesseractException e) {
       throw new RuntimeException(e);
+    }
+
+    if (result.isEmpty()) { // 빈 응답이면 READY 출력
+      result.add(new TextWithCoordinates(
+              "READY",0 ,0, 0 ,0
+      ));
     }
 
     return ResponseEntity.ok(result);
