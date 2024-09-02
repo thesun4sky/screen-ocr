@@ -60,7 +60,7 @@ public class Tess4jV1 {
 
     public String getDisplayText(String recognizedText) {
       var player = "[Player " + this.num + "] ";
-      if (Set.of(3,4,6,9).contains(this.num)) {
+      if (Set.of(3,4,6,9).contains(this.num) && recognizedText.split("백 실버 ").length > 1) {
         return player + recognizedText.split("백 실버 ")[1] + " " + recognizedText.split("백 실버")[0] + "백 실버";
       }
       return player + recognizedText;
