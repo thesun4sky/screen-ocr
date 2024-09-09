@@ -69,15 +69,15 @@ public class Tess4jV1 {
 
   // 기존의 Rectangle 배열을 CustomRectangle 배열로 대체
   private final Player[] PREDEFINED_REGIONS = {
-          new Player(1, 0.08, 0.25, 0.16, 0.04), // 위1
-          new Player(2, 0.3, 0.2, 0.16, 0.04),  // 위2
-          new Player(3, 0.54, 0.2, 0.16, 0.04), // 위3
-          new Player(4, 0.76, 0.25, 0.16, 0.04), // 위4
-          new Player(5, 0.03, 0.48, 0.16, 0.04),// 중1
-          new Player(6, 0.808, 0.48, 0.16, 0.04),   // 중2
-          new Player(7, 0.08, 0.71, 0.16, 0.04),   // 아1
-          new Player(8, 0.265, 0.94, 0.2, 0.04),   // 아2 (나)
-          new Player(9, 0.76, 0.71, 0.16, 0.04)    // 아3
+          new Player(1, 0.12, 0.25, 0.1, 0.04), // 위1
+          new Player(2, 0.34, 0.2, 0.1, 0.04),  // 위2
+          new Player(3, 0.5, 0.2, 0.1, 0.04), // 위3
+          new Player(4, 0.72, 0.25, 0.1, 0.04), // 위4
+          new Player(5, 0.07, 0.48, 0.1, 0.04),// 중1
+          new Player(6, 0.768, 0.48, 0.1, 0.04),   // 중2
+          new Player(7, 0.12, 0.71, 0.1, 0.04),   // 아1
+          new Player(8, 0.385, 0.94, 0.1, 0.04),   // 아2 (나)
+          new Player(9, 0.72, 0.71, 0.1, 0.04)    // 아3
   };
 
   @PostMapping(value = "ocr/v1/recognize-screen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
