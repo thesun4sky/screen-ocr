@@ -56,7 +56,7 @@ public class Tess4jV1 {
         Rectangle region = player.toAbsoluteRectangle(image.getWidth(), image.getHeight());
         BufferedImage regionImage = image.getSubimage(region.x, region.y, region.width, region.height);
 
-        String subImageFileName = String.format("%s_%s_player_%d.png", userId, timestamp, player.num);
+        String subImageFileName = String.format("%s_%s_player_%d.png", userId, timestamp, player.index);
         File outputFile = new File(SUBIMAGE_STORAGE_PATH + subImageFileName);
         ImageIO.write(regionImage, "png", outputFile);
 

@@ -10,102 +10,134 @@ import org.slf4j.LoggerFactory;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
+
 
 public class DynamicTextRegionFinder {
     private Logger LOGGER = LoggerFactory.getLogger(DynamicTextRegionFinder.class);
     private static final double HEIGHT_RATIO = 0.04;
     private static final double[] Y_RATIOS = {0.2, 0.25, 0.48, 0.71, 0.94};
-    private static final double MAX_WIDTH_RATIO = 0.16;
+    private static final double MAX_WIDTH_RATIO = 0.15;
 
     public List<Player> findDynamicRegions(BufferedImage image) throws TesseractException {
-        List<Player> players = new ArrayList<>();
-        ITesseract tesseract = new Tesseract();
-        tesseract.setLanguage("kor+eng");
-
         int imageWidth = image.getWidth();
         int imageHeight = image.getHeight();
         int centerX = imageWidth / 2;
 
-        for (double yRatio : Y_RATIOS) {
-            int y = (int) (yRatio * imageHeight);
-            int height = (int) (HEIGHT_RATIO * imageHeight);
+        List<Player> parallelPlayers = Arrays.stream(Y_RATIOS)
+                .boxed()
+                .parallel()
+                .flatMap(yRatio -> {
+                    List<Player> localPlayers = new ArrayList<>();
+                    try {
+                        int y = (int) (yRatio * imageHeight);
+                        int height = (int) (HEIGHT_RATIO * imageHeight);
 
-            if (yRatio != 0.94) {
-                // 왼쪽 탐색
-                Player leftPlayer = findPlayerLeft(image, centerX, y, height, tesseract);
-                if (leftPlayer != null) players.add(leftPlayer);
+                        ITesseract tesseract = new Tesseract();
+                        tesseract.setLanguage("kor+eng");
 
-                // 오른쪽 탐색
-                Player rightPlayer = findPlayerRight(image, centerX, y, height, tesseract);
-                if (rightPlayer != null) players.add(rightPlayer);
-            } else {
-                // 0.94 구간은 기존 방식대로 처리
-                Player centerPlayer = findPlayerCenter(image, centerX, y, height, tesseract);
-                if (centerPlayer != null) players.add(centerPlayer);
-            }
+                        if (yRatio != 0.94) {
+                            // 왼쪽 탐색
+                            int leftIndex = yRatio == Y_RATIOS[0] ? 2 : yRatio == Y_RATIOS[1] ? 1 : yRatio == Y_RATIOS[2] ? 5 : yRatio == Y_RATIOS[3] ? 7 : -1;
+                            int leftStartX = leftIndex == 2 ? centerX : centerX - (int) (imageWidth * MAX_WIDTH_RATIO);
+                            Player leftPlayer = findPlayerLeft(leftIndex, image, leftStartX, y, height, tesseract);
+                            if (leftPlayer != null) localPlayers.add(leftPlayer);
 
-            LOGGER.info("Players found for yRatio ({}): {}", yRatio, players);
-        }
+                            // 오른쪽 탐색
+                            int rightIndex = yRatio == Y_RATIOS[0] ? 3 : yRatio == Y_RATIOS[1] ? 4 : yRatio == Y_RATIOS[2] ? 6 : yRatio == Y_RATIOS[3] ? 9 : -1;
+                            int rightStartX = rightIndex == 3 ? centerX : centerX + (int) (imageWidth * MAX_WIDTH_RATIO);
+                            Player rightPlayer = findPlayerRight(rightIndex, image, rightStartX, y, height, tesseract);
+                            if (rightPlayer != null) localPlayers.add(rightPlayer);
+                        } else {
+                            // 0.94 구간은 왼쪽만 탐색
+                            int index = 8;
+                            Player centerPlayer = findPlayerLeft(index, image, centerX, y, height, tesseract);
+                            if (centerPlayer != null) localPlayers.add(centerPlayer);
+                        }
+                    } catch (TesseractException e) {
+                        LOGGER.error(e.getMessage(), e);
+                    }
 
-        return players;
+                    LOGGER.info("Players found for yRatio ({}): {}", yRatio, localPlayers);
+                    return localPlayers.stream();
+                })
+                .toList();
+
+        return new CopyOnWriteArrayList<>(parallelPlayers);
     }
 
-    private Player findPlayerLeft(BufferedImage image, int startX, int y, int height, ITesseract tesseract) throws TesseractException {
+    private Player findPlayerLeft(int index, BufferedImage image, int startX, int y, int height, ITesseract tesseract) throws TesseractException {
         int imageWidth = image.getWidth();
-        int width = (int) (imageWidth * MAX_WIDTH_RATIO);
-        Pattern startPattern = Pattern.compile("^[A-Za-z]");
-        Pattern endPattern = Pattern.compile("버$");
-        LOGGER.info("[findPlayerLeft] startX({}) - width({}) = {}", startX, width, startX - width);
+        int initialWidth = (int) (imageWidth * MAX_WIDTH_RATIO);
+        Pattern startPattern = Pattern.compile("^\\s*[A-Za-z]{3,}");
+        Pattern endPattern = Pattern.compile("버\\s*$");
+        // LOGGER.info("[findPlayerLeft] startX({}) - width({}) = {}", startX, width, startX - width);
 
-        for (int x = startX - width; x >= 0; x -= 100) {
+        for (int x = startX - initialWidth; x >= 0; x -= 10) {
+            int width = initialWidth;
             Rectangle rect = new Rectangle(x, y, width, height);
             String result = tesseract.doOCR(image, rect).trim();
-            LOGGER.info("[findPlayerLeft] result of x,y ({},{}) : {}", x, y, result);
-            if (startPattern.matcher(result).find() && endPattern.matcher(result).find()) {
-                double xRatio = (double) x / imageWidth;
-                double widthRatio = (double) width / imageWidth;
-                return new Player(0, xRatio, (double) y / image.getHeight(), widthRatio, HEIGHT_RATIO);
+            LOGGER.info("[findPlayerLeft] result of index ({}) : {}", index, result);
+
+            if (endPattern.matcher(result).find()) {
+                LOGGER.info("end Found");
+                // '버' 패턴을 찾았으면, width를 늘려가며 startPattern을 찾습니다.
+                while (x >= 0 && width <= startX - x) {
+                    rect = new Rectangle(x, y, width, height);
+                    result = tesseract.doOCR(image, rect).trim();
+                    LOGGER.info("[findPlayerLeft] Expanded result of index ({}) : {}", index, result);
+
+                    if (startPattern.matcher(result).find()) {
+                        double xRatio = (double) x / imageWidth;
+                        double widthRatio = (double) width / imageWidth;
+                        return new Player(index, xRatio, (double) y / image.getHeight(), widthRatio, HEIGHT_RATIO);
+                    }
+
+                    width += 10;  // width를 조금씩 늘립니다.
+                }
+            } else if (!result.contains("백") && !result.contains("실") && !result.contains("버")) {
+                x -= 50;
+                LOGGER.info("jump");
             }
         }
         return null;
     }
 
-    private Player findPlayerRight(BufferedImage image, int startX, int y, int height, ITesseract tesseract) throws TesseractException {
+    private Player findPlayerRight(int index, BufferedImage image, int startX, int y, int height, ITesseract tesseract) throws TesseractException {
         int imageWidth = image.getWidth();
-        int width = (int) (imageWidth * MAX_WIDTH_RATIO);
-        Pattern startPattern = Pattern.compile("^[0-9]");
-        Pattern endPattern = Pattern.compile("[A-Za-z]$");
-        LOGGER.info("[findPlayerRight] startX({}) - width({}) = {}", startX, width, startX - width);
+        int initialWidth = (int) (imageWidth * MAX_WIDTH_RATIO);
+        Pattern startPattern = Pattern.compile("^\\s*\\d{2,}");
+        Pattern endPattern = Pattern.compile("[A-Za-z]{3,}\\s*$");
 
-        for (int x = startX; x + width <= imageWidth; x += 100) {
-            Rectangle rect = new Rectangle(x, y, width, height);
+        for (int x = startX; x + initialWidth <= imageWidth; x += 10) {
+            Rectangle rect = new Rectangle(x, y, initialWidth, height);
             String result = tesseract.doOCR(image, rect).trim();
-            LOGGER.info("[findPlayerRight] result of x,y ({},{}) : {}", x, y, result);
-            if (startPattern.matcher(result).find() && endPattern.matcher(result).find()) {
-                double xRatio = (double) x / imageWidth;
-                double widthRatio = (double) width / imageWidth;
-                return new Player(0, xRatio, (double) y / image.getHeight(), widthRatio, HEIGHT_RATIO);
-            }
-        }
-        return null;
-    }
+            LOGGER.info("[findPlayerRight] result of index ({}) : {}", index, result);
 
-    private Player findPlayerCenter(BufferedImage image, int centerX, int y, int height, ITesseract tesseract) throws TesseractException {
-        int imageWidth = image.getWidth();
-        int maxWidth = (int) (MAX_WIDTH_RATIO * imageWidth);
+            if (startPattern.matcher(result).find()) {
+                LOGGER.info("start Found");
+                // startPattern을 찾았으면, width를 늘려가며 endPattern을 찾습니다.
+                int width = initialWidth;
+                while (x + width <= imageWidth) {
+                    rect = new Rectangle(x, y, width, height);
+                    result = tesseract.doOCR(image, rect).trim();
+                    LOGGER.info("[findPlayerRight] Expanded result of index ({}) : {}", index, result);
 
-        for (int width = 50; width <= maxWidth; width += 10) {
-            int x = centerX - width / 2;
-            Rectangle rect = new Rectangle(x, y, width, height);
-            String result = tesseract.doOCR(image, rect).trim();
+                    if (endPattern.matcher(result).find()) {
+                        double xRatio = (double) x / imageWidth;
+                        double widthRatio = (double) width / imageWidth;
+                        return new Player(index, xRatio, (double) y / image.getHeight(), widthRatio, HEIGHT_RATIO);
+                    }
 
-            if (result.contains("백") && result.contains("실") && result.contains("버")) {
-                double xRatio = (double) x / imageWidth;
-                double widthRatio = (double) width / imageWidth;
-                return new Player(0, xRatio, (double) y / image.getHeight(), widthRatio, HEIGHT_RATIO);
+                    width += 10;  // width를 조금씩 늘립니다.
+                }
+            } else if (!result.contains("백") && !result.contains("실") && !result.contains("버")) {
+                x += 50;
+                LOGGER.info("jump");
             }
         }
         return null;
@@ -114,11 +146,11 @@ public class DynamicTextRegionFinder {
     // Player 클래스 정의 (이전과 동일)
     @ToString
     public class Player {
-        int num;
+        int index;
         double x, y, width, height;
 
-        public Player(int num, double x, double y, double width, double height) {
-            this.num = num;
+        public Player(int index, double x, double y, double width, double height) {
+            this.index = index;
             this.x = x;
             this.y = y;
             this.width = width;
@@ -135,9 +167,11 @@ public class DynamicTextRegionFinder {
         }
 
         public String getDisplayText(String recognizedText) {
-            var player = "[Player " + this.num + "] ";
-            if (Set.of(3,4,6,9).contains(this.num) && recognizedText.split("백 실버 ").length > 1) {
-                return player + recognizedText.split("백 실버 ")[1] + " " + recognizedText.split("백 실버")[0] + "백 실버";
+            var player = "[Player " + this.index + "] ";
+            if (Set.of(3,4,6,9).contains(this.index)
+                    && recognizedText.contains("백") && recognizedText.contains("버")
+                    && recognizedText.split("버").length > 1) {
+                return player + recognizedText.split("버 ")[1] + " " + recognizedText.split("백")[0] + "백 실버";
             }
             return player + recognizedText;
         }
