@@ -37,6 +37,10 @@ dependencies {
     // Commons IO
     implementation 'commons-io:commons-io:2.15.1'
 
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
     // Test dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'io.rest-assured:rest-assured:5.4.0'

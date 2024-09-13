@@ -1,4 +1,3 @@
-/* (C) 2013 */
 package com.tess4j.rest;
 
 import com.tess4j.rest.repository.ImageRepository;
@@ -25,7 +24,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @SpringBootApplication
 @RestController
@@ -35,50 +33,7 @@ public class Tess4jV1 {
 
   @Autowired private ImageRepository repository;
 
-  private static final String SUBIMAGE_STORAGE_PATH = "/";
-  // 상대좌표를 담기 위한 CustomRectangle 클래스 정의
-  class Player {
-    int num;
-    double x, y, width, height;
-
-    public Player(int num, double x, double y, double width, double height) {
-      this.num = num;
-      this.x = x;
-      this.y = y;
-      this.width = width;
-      this.height = height;
-    }
-
-    // 이미지를 기준으로 절대좌표 Rectangle로 변환
-    public Rectangle toAbsoluteRectangle(int imageWidth, int imageHeight) {
-      int absX = (int) (x * imageWidth);
-      int absY = (int) (y * imageHeight);
-      int absWidth = (int) (width * imageWidth);
-      int absHeight = (int) (height * imageHeight);
-      return new Rectangle(absX, absY, absWidth, absHeight);
-    }
-
-    public String getDisplayText(String recognizedText) {
-      var player = "[Player " + this.num + "] ";
-      if (Set.of(3,4,6,9).contains(this.num) && recognizedText.split("백 실버 ").length > 1) {
-        return player + recognizedText.split("백 실버 ")[1] + " " + recognizedText.split("백 실버")[0] + "백 실버";
-      }
-      return player + recognizedText;
-    }
-  }
-
-  // 기존의 Rectangle 배열을 CustomRectangle 배열로 대체
-  private final Player[] PREDEFINED_REGIONS = {
-          new Player(1, 0.12, 0.25, 0.1, 0.04), // 위1
-          new Player(2, 0.34, 0.2, 0.1, 0.04),  // 위2
-          new Player(3, 0.5, 0.2, 0.1, 0.04), // 위3
-          new Player(4, 0.72, 0.25, 0.1, 0.04), // 위4
-          new Player(5, 0.07, 0.48, 0.1, 0.04),// 중1
-          new Player(6, 0.768, 0.48, 0.1, 0.04),   // 중2
-          new Player(7, 0.12, 0.71, 0.1, 0.04),   // 아1
-          new Player(8, 0.385, 0.94, 0.1, 0.04),   // 아2 (나)
-          new Player(9, 0.72, 0.71, 0.1, 0.04)    // 아3
-  };
+  public static final String SUBIMAGE_STORAGE_PATH = "/";
 
   @PostMapping(value = "ocr/v1/recognize-screen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<List<TextWithCoordinates>> recognizeScreen(@RequestParam("file") MultipartFile file,
@@ -88,18 +43,19 @@ public class Tess4jV1 {
     try {
       BufferedImage image = ImageIO.read(file.getInputStream());
       Tesseract tesseract = new Tesseract();
-      tesseract.setPageSegMode(1); // Automatic page segmentation with OSD
+      tesseract.setPageSegMode(1);
       tesseract.setOcrEngineMode(1);
       tesseract.setLanguage("kor+eng");
 
       String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
 
-      for (var player : PREDEFINED_REGIONS) {
-        // 상대 좌표를 절대 좌표로 변환
+      DynamicTextRegionFinder regionFinder = new DynamicTextRegionFinder();
+      List<DynamicTextRegionFinder.Player> players = regionFinder.findDynamicRegions(image);
+
+      for (DynamicTextRegionFinder.Player player : players) {
         Rectangle region = player.toAbsoluteRectangle(image.getWidth(), image.getHeight());
         BufferedImage regionImage = image.getSubimage(region.x, region.y, region.width, region.height);
 
-        // subImage 저장
         String subImageFileName = String.format("%s_%s_player_%d.png", userId, timestamp, player.num);
         File outputFile = new File(SUBIMAGE_STORAGE_PATH + subImageFileName);
         ImageIO.write(regionImage, "png", outputFile);
@@ -117,15 +73,13 @@ public class Tess4jV1 {
                 region.height
         ));
       }
-    } catch (IOException e) {
+    } catch (IOException | TesseractException e) {
       e.printStackTrace();
-    } catch (TesseractException e) {
-      throw new RuntimeException(e);
     }
 
-    if (result.isEmpty()) { // 빈 응답이면 READY 출력
+    if (result.isEmpty()) {
       result.add(new TextWithCoordinates(
-              "READY",0 ,0, 0 ,0
+              "READY", 0, 0, 0, 0
       ));
     }
 
