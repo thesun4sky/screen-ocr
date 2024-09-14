@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @SpringBootApplication
@@ -51,6 +52,7 @@ public class Tess4jV1 {
 
       DynamicTextRegionFinder regionFinder = new DynamicTextRegionFinder();
       List<DynamicTextRegionFinder.Player> players = regionFinder.findDynamicRegions(image);
+      players.sort(Comparator.comparing(DynamicTextRegionFinder.Player::getIndex));
 
       for (DynamicTextRegionFinder.Player player : players) {
         Rectangle region = player.toAbsoluteRectangle(image.getWidth(), image.getHeight());
