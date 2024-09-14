@@ -43,7 +43,7 @@ public class Tess4jV1 {
     try {
       BufferedImage image = ImageIO.read(file.getInputStream());
       Tesseract tesseract = new Tesseract();
-      tesseract.setPageSegMode(1);
+      tesseract.setPageSegMode(7);
       tesseract.setOcrEngineMode(1);
       tesseract.setLanguage("kor+eng");
 
@@ -61,9 +61,8 @@ public class Tess4jV1 {
         ImageIO.write(regionImage, "png", outputFile);
 
         String recognizedText = tesseract.doOCR(regionImage).trim();
-        if (!recognizedText.contains("백 실버")) {
-          continue;
-        }
+        recognizedText = recognizedText.replaceAll("[!@#$%^&*().?\":{}|<>=_-]", "");
+
         String displayText = player.getDisplayText(recognizedText);
         result.add(new TextWithCoordinates(
                 displayText,
