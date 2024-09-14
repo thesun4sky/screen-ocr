@@ -44,11 +44,26 @@ public class Tess4jV1 {
     try {
       BufferedImage image = ImageIO.read(file.getInputStream());
       Tesseract tesseract = new Tesseract();
-      tesseract.setPageSegMode(7);
-      tesseract.setOcrEngineMode(1);
       tesseract.setLanguage("kor+eng");
 
       String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+
+      var checkRegion = new Rectangle(image.getWidth()/3, image.getHeight()/2, image.getWidth()/5, image.getWidth()/10);
+      BufferedImage checkImage = image.getSubimage(checkRegion.x, checkRegion.y, checkRegion.width, checkRegion.height);
+      String checkText = tesseract.doOCR(checkImage).trim();
+      if (!checkText.contains("Total")) {
+        String subImageFileName = String.format("%s_%s_scanning.png", userId, timestamp);
+        File outputFile = new File(SUBIMAGE_STORAGE_PATH + subImageFileName);
+        ImageIO.write(checkImage, "png", outputFile);
+        result.add(new TextWithCoordinates(
+                "SCANNING...", 0, 0, 0, 0
+        ));
+        return ResponseEntity.ok(result);
+      }
+
+      // check 후에 단일라인 모드로 설정해야함
+      tesseract.setPageSegMode(7);
+      tesseract.setOcrEngineMode(1);
 
       DynamicTextRegionFinder regionFinder = new DynamicTextRegionFinder();
       List<DynamicTextRegionFinder.Player> players = regionFinder.findDynamicRegions(image);
