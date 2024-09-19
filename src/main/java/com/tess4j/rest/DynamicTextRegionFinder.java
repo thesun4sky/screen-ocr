@@ -1,6 +1,7 @@
 package com.tess4j.rest;
 
 import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 import net.sourceforge.tess4j.ITesseract;
 import net.sourceforge.tess4j.Tesseract;
@@ -30,7 +31,7 @@ public class DynamicTextRegionFinder {
     private static final Pattern END_PATTERN_RIGHT = Pattern.compile("[A-Za-z0-9]{5,}\\s*$");
     private static final Pattern MID_PATTERN = Pattern.compile(".*백.*실.*버.*");
 
-    public List<Player> findDynamicRegions(BufferedImage image) throws TesseractException {
+    public List<Player> findDynamicRegions(BufferedImage image, List<Player> existPlayer) throws TesseractException {
         int imageWidth = image.getWidth();
         int imageHeight = image.getHeight();
         int centerX = imageWidth / 2;
@@ -38,11 +39,11 @@ public class DynamicTextRegionFinder {
         return Arrays.stream(Y_RATIOS)
                 .boxed()
                 .parallel()
-                .flatMap(yRatio -> processYRatio(image, imageWidth, imageHeight, centerX, yRatio))
+                .flatMap(yRatio -> processYRatio(image, imageWidth, imageHeight, centerX, yRatio, existPlayer))
                 .collect(Collectors.toCollection(CopyOnWriteArrayList::new));
     }
 
-    private Stream<Player> processYRatio(BufferedImage image, int imageWidth, int imageHeight, int centerX, double yRatio) {
+    private Stream<Player> processYRatio(BufferedImage image, int imageWidth, int imageHeight, int centerX, double yRatio, List<Player> existPlayer) {
         List<Player> localPlayers = new ArrayList<>();
         try {
             int y = (int) (yRatio * imageHeight);
@@ -50,9 +51,9 @@ public class DynamicTextRegionFinder {
             ITesseract tesseract = initializeTesseract();
 
             if (yRatio != 0.94) {
-                processLeftAndRightPlayers(image, imageWidth, centerX, yRatio, y, height, tesseract, localPlayers);
+                processLeftAndRightPlayers(image, imageWidth, centerX, yRatio, y, height, tesseract, localPlayers, existPlayer);
             } else {
-                processCenterPlayer(image, centerX, y, height, tesseract, localPlayers);
+                processCenterPlayer(image, centerX, y, height, tesseract, localPlayers, existPlayer);
             }
         } catch (TesseractException e) {
             LOGGER.error("Error processing yRatio {}: {}", yRatio, e.getMessage(), e);
@@ -86,21 +87,26 @@ public class DynamicTextRegionFinder {
         return -1;
     }
 
-    private void processCenterPlayer(BufferedImage image, int centerX, int y, int height, ITesseract tesseract, List<Player> localPlayers) throws TesseractException {
-        Player centerPlayer = findPlayer(8, image, 0, centerX, y, height, tesseract, true);
+    private void processCenterPlayer(BufferedImage image, int centerX, int y, int height, ITesseract tesseract, List<Player> localPlayers, List<Player> existPlayer) throws TesseractException {
+        int centerIndex = 8;
+        Player centerPlayer = existPlayer(existPlayer, centerIndex) ? null : findPlayer(centerIndex, image, 0, centerX, y, height, tesseract, true);
         if (centerPlayer != null) localPlayers.add(centerPlayer);
     }
 
 
-    private void processLeftAndRightPlayers(BufferedImage image, int imageWidth, int centerX, double yRatio, int y, int height, ITesseract tesseract, List<Player> localPlayers) throws TesseractException {
+    private void processLeftAndRightPlayers(BufferedImage image, int imageWidth, int centerX, double yRatio, int y, int height, ITesseract tesseract, List<Player> localPlayers, List<Player> existPlayer) throws TesseractException {
         int leftIndex = getLeftIndex(yRatio);
         int rightIndex = getRightIndex(yRatio);
 
-        Player leftPlayer = findPlayer(leftIndex, image, 0, centerX, y, height, tesseract, true);
-        Player rightPlayer = findPlayer(rightIndex, image, centerX, imageWidth, y, height, tesseract, false);
+        Player leftPlayer = existPlayer(existPlayer, leftIndex) ? null : findPlayer(leftIndex, image, 0, centerX, y, height, tesseract, true);
+        Player rightPlayer = existPlayer(existPlayer, rightIndex) ? null : findPlayer(rightIndex, image, centerX, imageWidth, y, height, tesseract, false);
 
         if (leftPlayer != null) localPlayers.add(leftPlayer);
         if (rightPlayer != null) localPlayers.add(rightPlayer);
+    }
+
+    private boolean existPlayer(List<Player> existPlayer, int index) {
+        return existPlayer.stream().anyMatch(p -> p.getIndex() == index);
     }
 
     private Player findPlayer(int index, BufferedImage image, int startX, int endX, int y, int height, ITesseract tesseract, boolean isLeft) throws TesseractException {
@@ -145,8 +151,9 @@ public class DynamicTextRegionFinder {
     }
 
     @ToString
-    public class Player {
-        @Getter
+    @Getter
+    @Setter
+    public static class Player {
         int index;
         double x, y, width, height;
 
@@ -171,9 +178,9 @@ public class DynamicTextRegionFinder {
             if (Set.of(3,4,6,9).contains(this.index)
                     && recognizedText.contains("백") && recognizedText.contains("버")
                     && recognizedText.split("버").length > 1) {
-                return player + recognizedText.split("버")[1] + " " + recognizedText.split("백")[0] + "백실버";
+                return player + recognizedText.split("버")[1] + " " + recognizedText.split("백")[0] + " WON";
             }
-            return player + recognizedText.split("백")[0] + "백실버";
+            return player + recognizedText.split("백")[0] + " WON";
         }
     }
 }

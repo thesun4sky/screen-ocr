@@ -1,6 +1,6 @@
 package com.tess4j.rest;
 
-import com.tess4j.rest.repository.ImageRepository;
+import com.tess4j.rest.repository.UserRepository;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
 import org.slf4j.Logger;
@@ -32,14 +32,24 @@ public class Tess4jV1 {
 
   private Logger LOGGER = LoggerFactory.getLogger(Tess4jV1.class);
 
-  @Autowired private ImageRepository repository;
+  @Autowired
+  private UserRepository userRepository;
 
   public static final String SUBIMAGE_STORAGE_PATH = "/";
 
   @PostMapping(value = "ocr/v1/recognize-screen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<List<TextWithCoordinates>> recognizeScreen(@RequestParam("file") MultipartFile file,
-                                                                   @RequestParam("userId") String userId) {
+                                                                   @RequestParam("userId") String userId, @RequestParam("userPassword") String userPassword) {
     List<TextWithCoordinates> result = new ArrayList<>();
+
+    var loginUser = userRepository.findByUserIdAndUserPassword(userId, userPassword);
+
+    if (loginUser.isEmpty()) {
+      result.add(new TextWithCoordinates(
+              "FAIL TO LOGIN", 0, 0, 0, 0
+      ));
+      return ResponseEntity.ok(result);
+    }
 
     try {
       BufferedImage image = ImageIO.read(file.getInputStream());
@@ -65,9 +75,13 @@ public class Tess4jV1 {
       tesseract.setPageSegMode(7);
       tesseract.setOcrEngineMode(1);
 
-      DynamicTextRegionFinder regionFinder = new DynamicTextRegionFinder();
-      List<DynamicTextRegionFinder.Player> players = regionFinder.findDynamicRegions(image);
-      players.sort(Comparator.comparing(DynamicTextRegionFinder.Player::getIndex));
+      var players = loginUser.get().getPlayers();
+
+      if (players.size() < 9) {
+          DynamicTextRegionFinder regionFinder = new DynamicTextRegionFinder();
+        players.addAll(regionFinder.findDynamicRegions(image, players));
+        players.sort(Comparator.comparing(DynamicTextRegionFinder.Player::getIndex));
+      }
 
       for (DynamicTextRegionFinder.Player player : players) {
         Rectangle region = player.toAbsoluteRectangle(image.getWidth(), image.getHeight());
@@ -88,6 +102,11 @@ public class Tess4jV1 {
                 region.width,
                 region.height
         ));
+      }
+      if (!players.isEmpty()) {
+        LOGGER.info("player coordinates 저장 : {}", players.toArray());
+        loginUser.get().setPlayers(players);
+        userRepository.save(loginUser.get());
       }
     } catch (IOException | TesseractException e) {
       e.printStackTrace();
