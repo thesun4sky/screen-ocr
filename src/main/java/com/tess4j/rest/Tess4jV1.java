@@ -91,8 +91,10 @@ public class Tess4jV1 {
         File outputFile = new File(SUBIMAGE_STORAGE_PATH + subImageFileName);
         ImageIO.write(regionImage, "png", outputFile);
 
-        String recognizedText = tesseract.doOCR(regionImage).trim();
-        recognizedText = recognizedText.replaceAll("[!@#$%^&*().?\":{}|<>=_-]", "");
+        String rawText = tesseract.doOCR(regionImage).trim();
+        var recognizedText = OcrPostProcessor.process(rawText);
+
+        LOGGER.info("player {} recognizedText : {}", player.index, recognizedText);
 
         String displayText = player.getDisplayText(recognizedText);
         result.add(new TextWithCoordinates(
