@@ -1,7 +1,7 @@
 spring.datasource:
-  url: jdbc:postgresql://ec2-13-125-191-192.ap-northeast-2.compute.amazonaws.com:5432/postgres
-  username: postgres
-  password: rlaxodid23!
+  url: ${{ secrets.DB_URL }}
+  username: ${{ secrets.DB_USERNAME }}
+  password: ${{ secrets.DB_PASSWORD }}
 spring.jpa:
   properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
   hibernate.ddl-auto: update
