@@ -1,6 +1,10 @@
 package com.tess4j.rest;
 
 import com.tess4j.rest.repository.UserRepository;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
 import org.slf4j.Logger;
@@ -37,17 +41,21 @@ public class Tess4jV1 {
 
   public static final String SUBIMAGE_STORAGE_PATH = "/";
 
+  private static final List<PlayerResponse> INITIAL_PLAYER_RESPONSE = List.of(
+          new PlayerResponse(), new PlayerResponse(), new PlayerResponse(), new PlayerResponse(),
+          new PlayerResponse(), new PlayerResponse(), new PlayerResponse(), new PlayerResponse()
+  );
+
   @PostMapping(value = "ocr/v1/recognize-screen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public ResponseEntity<List<TextWithCoordinates>> recognizeScreen(@RequestParam("file") MultipartFile file,
-                                                                   @RequestParam("userId") String userId, @RequestParam("userPassword") String userPassword) {
-    List<TextWithCoordinates> result = new ArrayList<>();
+  public ResponseEntity<List<PlayerResponse>> recognizeScreen(@RequestParam("file") MultipartFile file,
+                                                              @RequestParam("userId") String userId,
+                                                              @RequestParam("userPassword") String userPassword,
+                                                              @RequestParam("rectangles") PlayerRectangles playerRectangles) {
+    List<PlayerResponse> result = new ArrayList<>(INITIAL_PLAYER_RESPONSE);
 
     var loginUser = userRepository.findByUserIdAndUserPassword(userId, userPassword);
 
     if (loginUser.isEmpty()) {
-      result.add(new TextWithCoordinates(
-              "FAIL TO LOGIN", 0, 0, 0, 0
-      ));
       return ResponseEntity.ok(result);
     }
 
@@ -65,9 +73,6 @@ public class Tess4jV1 {
         String subImageFileName = String.format("%s_%s_scanning.png", userId, timestamp);
         File outputFile = new File(SUBIMAGE_STORAGE_PATH + subImageFileName);
         ImageIO.write(checkImage, "png", outputFile);
-        result.add(new TextWithCoordinates(
-                "SCANNING...", 0, 0, 0, 0
-        ));
         return ResponseEntity.ok(result);
       }
 
@@ -75,108 +80,37 @@ public class Tess4jV1 {
       tesseract.setPageSegMode(7);
       tesseract.setOcrEngineMode(1);
 
-      var players = loginUser.get().getPlayers();
-
-      if (players.size() < 9) {
-          DynamicTextRegionFinder regionFinder = new DynamicTextRegionFinder();
-        players.addAll(regionFinder.findDynamicRegions(image, players));
-        players.sort(Comparator.comparing(DynamicTextRegionFinder.Player::getIndex));
-      }
-
-      for (DynamicTextRegionFinder.Player player : players) {
-        Rectangle region = player.toAbsoluteRectangle(image.getWidth(), image.getHeight());
+      for (PlayerRectangles.RectangleInfo playerRectangle : playerRectangles.getRectangleInfos()) {
+        Rectangle region = playerRectangle.getRectangle();
         BufferedImage regionImage = image.getSubimage(region.x, region.y, region.width, region.height);
 
-        String subImageFileName = String.format("%s_%s_player_%d.png", userId, timestamp, player.index);
+        String subImageFileName = String.format("%s_%s_player_%d.png", userId, timestamp, playerRectangle.getIndex());
         File outputFile = new File(SUBIMAGE_STORAGE_PATH + subImageFileName);
         ImageIO.write(regionImage, "png", outputFile);
 
         String rawText = tesseract.doOCR(regionImage).trim();
         var recognizedText = OcrPostProcessor.process(rawText);
 
-        LOGGER.info("player {} recognizedText : {}", player.index, recognizedText);
+        LOGGER.info("player {} recognizedText : {}", playerRectangle.getIndex(), recognizedText);
 
-        String displayText = player.getDisplayText(recognizedText);
-        result.add(new TextWithCoordinates(
-                displayText,
-                region.x,
-                region.y,
-                region.width,
-                region.height
-        ));
+        result.set(playerRectangle.getIndex() - 1, new PlayerResponse(0, 0, 0));
       }
-      if (!players.isEmpty()) {
-        LOGGER.info("player coordinates 저장 : {}", players.toArray());
-        loginUser.get().setPlayers(players);
-        userRepository.save(loginUser.get());
-      }
+
     } catch (IOException | TesseractException e) {
       e.printStackTrace();
-    }
-
-    if (result.isEmpty()) {
-      result.add(new TextWithCoordinates(
-              "READY", 0, 0, 0, 0
-      ));
     }
 
     return ResponseEntity.ok(result);
   }
 
-  static class TextWithCoordinates {
-    private String text;
-    private int x;
-    private int y;
-    private int width;
-    private int height;
-
-    public TextWithCoordinates(String text, int x, int y, int width, int height) {
-      this.text = text;
-      this.x = x;
-      this.y = y;
-      this.width = width;
-      this.height = height;
-    }
-
-    public String getText() {
-      return text;
-    }
-
-    public int getX() {
-      return x;
-    }
-
-    public int getY() {
-      return y;
-    }
-
-    public int getWidth() {
-      return width;
-    }
-
-    public int getHeight() {
-      return height;
-    }
-
-    public void setText(String text) {
-      this.text = text;
-    }
-
-    public void setX(int x) {
-      this.x = x;
-    }
-
-    public void setY(int y) {
-      this.y = y;
-    }
-
-    public void setWidth(int width) {
-      this.width = width;
-    }
-
-    public void setHeight(int height) {
-      this.height = height;
-    }
+  @Getter
+  @Setter
+  @NoArgsConstructor
+  @AllArgsConstructor
+  static class PlayerResponse {
+    private int vpip;
+    private int pfr;
+    private int threeBet;
   }
 
   public static void main(String[] args) {
